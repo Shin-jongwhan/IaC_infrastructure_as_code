@@ -1,6 +1,7 @@
 ### 250630
 ## playbook 기본 실행
 - -i hosts : hosts 라는 파일 안에 정의된 서버 목록(= 인벤토리)을 기준으로 playbook yaml을 실행한다는 것이다.
+- --limit \[server_name\] : hosts 파일 안에 정의된 server 또는 server group으로 한정하여 적용하게 한다.
 ```
 ansible-playbook -i hosts add_user_docker_group.yml
 ```
