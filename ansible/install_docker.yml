@@ -1,0 +1,35 @@
+- hosts: all_servers
+  become: yes
+  become_user: root
+  tasks:
+
+    - name: 1. Remove old Docker-related packages
+      shell: |
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+          apt-get remove -y "$pkg"
+        done
+
+    - name: 2. Add Docker GPG key and repository
+      shell: |
+        apt-get update
+        apt-get install -y ca-certificates curl
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo ${UBUNTU_CODENAME:-$VERSION_CODENAME}) stable" > /etc/apt/sources.list.d/docker.list
+        apt-get update
+
+    - name: 3. Install Docker packages
+      shell: |
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    - name: 4. Test Docker installation with hello-world
+      shell: docker run --rm hello-world
+      register: docker_test
+      failed_when: "'Hello from Docker!' not in docker_test.stdout"
+      changed_when: false
+
+    - name: 5. Print Docker test output
+      debug:
+        var: docker_test.stdout
