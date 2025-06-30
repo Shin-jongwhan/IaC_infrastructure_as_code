@@ -1,0 +1,23 @@
+- hosts: all_servers
+  become: yes
+  vars:
+    target_user: jhshin
+
+  tasks:
+    - name: Add user '{{ target_user }}' to docker group
+      user:
+        name: "{{ target_user }}"
+        groups: docker
+        append: yes
+
+    - name: Run 'docker ps' with sudo to verify installation
+      shell: sudo docker ps
+      register: docker_test
+      changed_when: false
+      ignore_errors: true
+
+    - name: Show Docker test result
+      debug:
+        msg: |
+          Docker access test result:
+          {{ docker_test.stdout }}
