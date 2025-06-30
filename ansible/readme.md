@@ -44,6 +44,7 @@ ssh jhshin@server
 
 ### sudo 접속을 허용한다.
 #### 비밀번호 없는 sudo 권한을 jhshin에게 설정해야 에러가 안 난다.
+### * IaC는 root로만 설치해야 하는 패키지가 많은데, 경우에 따라 root를 사용해야 할 때도 있다.
 ```
 echo "jhshin ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/jhshin
 ```
