@@ -1,0 +1,56 @@
+---
+- name: Install cri-dockerd for Docker runtime integration with Kubernetes
+  hosts: all_servers
+  become: true
+  vars:
+    # cri-dockerd 소스 코드 및 빌드 작업을 수행할 디렉토리
+    target_dir: /opt/workdir  # 실행 시 --extra-vars로 지정 가능
+
+  tasks:
+    - name: Create target directory if it doesn't exist
+      file:
+        path: "{{ target_dir }}"
+        state: directory
+        mode: '0755'
+      # 목적: cri-dockerd 소스 코드를 클론하고 빌드할 작업 디렉토리 확보
+
+    - name: Ensure system package cache is updated
+      apt:
+        update_cache: yes
+
+    - name: Install required build dependencies (git, golang, make)
+      apt:
+        name:
+          - git
+          - golang-go
+          - make
+        state: present
+      # 목적: cri-dockerd를 빌드하기 위한 필수 패키지 설치
+
+    - name: Clone cri-dockerd source code
+      git:
+        repo: https://github.com/Mirantis/cri-dockerd.git
+        dest: "{{ target_dir }}/cri-dockerd"
+        clone: yes
+        update: yes
+      # 목적: Docker 엔진을 Kubernetes에서 사용할 수 있도록 중간 계층인 cri-dockerd 소스 코드 클론
+
+    - name: Build cri-dockerd binary
+      make:
+        chdir: "{{ target_dir }}/cri-dockerd"
+        target: cri-dockerd
+      # 목적: 소스 코드로부터 cri-dockerd 실행 파일 생성
+
+    - name: Copy cri-dockerd binary to a location in PATH
+      copy:
+        src: "{{ target_dir }}/cri-dockerd/cri-dockerd"
+        dest: /usr/local/bin/cri-dockerd
+        mode: '0755'
+      # 목적: cri-dockerd를 시스템의 표준 실행 경로에 복사하여 kubelet 등에서 사용할 수 있도록 설정
+
+    - name: Ensure cri-dockerd binary has executable permission
+      file:
+        path: /usr/local/bin/cri-dockerd
+        mode: '0755'
+        state: file
+      # 목적: 실행 파일로서 권한이 올바르게 설정되었는지 확인 (chmod +x 역할)
