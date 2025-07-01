@@ -1,0 +1,29 @@
+---
+- name: Disable swap permanently
+  hosts: all_servers
+  become: true
+
+  tasks:
+    # Kubernetes는 안정적인 스케줄링을 위해 swap 사용을 금지함
+    # 따라서 클러스터 노드에서는 swap을 꺼야 함
+    - name: Turn off swap immediately
+      command: swapoff -a
+
+    # 부팅 시 다시 swap이 자동으로 활성화되지 않도록
+    # /etc/fstab에서 swap 관련 항목을 주석 처리함
+    - name: Comment out swap line in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\s+swap\s+.*)$'
+        replace: '# \1'
+        backup: yes  # 변경 전 /etc/fstab 파일을 백업
+
+    # swap이 성공적으로 꺼졌는지 확인하기 위해 메모리 사용 상태를 출력함
+    - name: Show memory usage (free -h)
+      command: free -h
+      register: memory_status
+
+    # 위 명령의 출력 결과를 콘솔에 표시
+    - name: Print memory status
+      debug:
+        msg: "{{ memory_status.stdout }}"
