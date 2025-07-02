@@ -1,0 +1,59 @@
+---
+- name: Configure and enable cri-dockerd for Kubernetes
+  hosts: all_servers
+  become: true
+
+  tasks:
+    - name: Create cri-docker.socket unit file
+      copy:
+        dest: /etc/systemd/system/cri-docker.socket
+        content: |
+          [Unit]
+          Description=CRI Dockerd Socket for Kubernetes
+          PartOf=cri-docker.service
+
+          [Socket]
+          ListenStream=/var/run/cri-dockerd.sock
+          SocketMode=0660
+          SocketUser=root
+          SocketGroup=docker
+
+          [Install]
+          WantedBy=sockets.target
+        mode: '0644'
+
+    - name: Create cri-docker.service unit file
+      copy:
+        dest: /etc/systemd/system/cri-docker.service
+        content: |
+          [Unit]
+          Description=CRI Dockerd Service
+          After=network.target docker.service
+          Requires=docker.service cri-docker.socket
+
+          [Service]
+          ExecStart=/usr/local/bin/cri-dockerd --container-runtime-endpoint fd://
+          Restart=always
+          StartLimitInterval=0
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Re-execute systemd to recognize new unit files
+      command: systemctl daemon-reexec
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    - name: Enable and start cri-docker.socket
+      systemd:
+        name: cri-docker.socket
+        enabled: yes
+        state: started
+
+    - name: Start cri-docker.service
+      systemd:
+        name: cri-docker.service
+        state: started
