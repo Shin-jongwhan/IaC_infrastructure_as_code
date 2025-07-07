@@ -1,0 +1,84 @@
+# kubeadm init playbook
+# control plane node에서만 실행한다.
+# kube config init yaml과 이를 바탕으로 실제 쓸 yaml을 구성하여 kubeadm init을 한다.
+# configuration parameter 지원 항목
+## kubeadm_dir : kubeadm config yaml 생성 경로
+## container_runtime : 현재 cri-docker만 가능
+## etcd_data_dir : etcd 경로
+- name: Automate kubeadm init using clean config overwrite
+  hosts: service
+  become: yes
+  vars:
+    kubeadm_dir: "/data/kubernetes/kubeadm"
+    container_runtime: "cri-docker"             # 이 playbook 버전에서는 cri-docker만 지원
+    etcd_data_dir: "/var/lib/etcd"
+
+  tasks:
+    - name: Ensure kubeadm working directory exists
+      file:
+        path: "{{ kubeadm_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generate default kubeadm-init.yaml
+      command: kubeadm config print init-defaults
+      register: kubeadm_default_config
+
+    - name: Save original kubeadm-init.yaml
+      copy:
+        dest: "{{ kubeadm_dir }}/kubeadm_init.yaml"
+        content: "{{ kubeadm_default_config.stdout }}"
+
+    - name: Get private IP address
+      shell: |
+        ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127' | head -n1
+      register: private_ip
+      changed_when: false
+
+    - name: Get hostname
+      command: hostname
+      register: hostname_result
+      changed_when: false
+
+    - name: Set cri_socket_path (used only if container_runtime is cri-docker)
+      set_fact:
+        cri_socket_path: "unix:///var/run/cri-dockerd.sock"
+      when: container_runtime == "cri-docker"
+
+    - name: Copy kubeadm_init.yaml to kubeadm.yaml
+      copy:
+        src: "{{ kubeadm_dir }}/kubeadm_init.yaml"
+        dest: "{{ kubeadm_dir }}/kubeadm.yaml"
+        remote_src: yes
+
+    - name: Patch advertiseAddress
+      replace:
+        path: "{{ kubeadm_dir }}/kubeadm.yaml"
+        regexp: '^(\s*advertiseAddress:)\s+.*'
+        replace: '\1{{ " " }}{{ private_ip.stdout }}'
+
+    - name: Patch hostname
+      replace:
+        path: "{{ kubeadm_dir }}/kubeadm.yaml"
+        regexp: '^(\s*name:)\s+.*'
+        replace: '\1{{ " " }}{{ hostname_result.stdout }}'
+
+    - name: Patch criSocket only if container_runtime is cri-docker
+      replace:
+        path: "{{ kubeadm_dir }}/kubeadm.yaml"
+        regexp: '^(\s*criSocket:)\s+.*'
+        replace: '\1{{ " " }}{{ cri_socket_path }}'
+      when: container_runtime == "cri-docker"
+
+    - name: Patch etcd dataDir (if custom path given)
+      replace:
+        path: "{{ kubeadm_dir }}/kubeadm.yaml"
+        regexp: '^(\s*dataDir:)\s+.*'
+        replace: '\1{{ " " }}{{ etcd_data_dir }}'
+      when: etcd_data_dir is defined
+
+    - name: Run kubeadm init
+      command: kubeadm init --config kubeadm.yaml
+      args:
+        chdir: "{{ kubeadm_dir }}"
+        creates: /etc/kubernetes/admin.conf
