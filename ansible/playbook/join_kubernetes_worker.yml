@@ -1,3 +1,6 @@
+# contole plane node에서 --print-join-command로 token 등의 정보를 얻는다.
+# 그리고 cri_socket은 설정한 container runtime socket 경로로 넣는다.
+# 그 다음 각 node에서 kubeadm join 명령어를 실행한다.
 ---
 - name: Get kubeadm join command on control plane
   hosts: service
