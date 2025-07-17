@@ -1,0 +1,20 @@
+# container 안에서 host dir와 연결할 때 mysql 접근 등에 사용
+- name: Create telegraf user and group (UID/GID 999)
+  hosts: all_servers
+  become: true
+  tasks:
+    - name: Ensure group 'telegraf' with GID 999 exists
+      group:
+        name: telegraf
+        gid: 999
+        state: present
+
+    - name: Ensure user 'telegraf' with UID 999 exists
+      user:
+        name: telegraf
+        uid: 999
+        group: telegraf
+        shell: /usr/sbin/nologin
+        create_home: no
+        state: present
+
